@@ -44,7 +44,7 @@ jobs:
           cp -R /tmp/ma_timer_native/android ./android
           cp -R /tmp/ma_timer_native/ios ./ios
 
-      - name: Configure Android manifest, SDK and Kotlin
+      - name: Configure Android manifest, SDK and Gradle memory
         shell: bash
         run: |
           python3 - <<'PY'
@@ -78,11 +78,6 @@ jobs:
           a = re.sub(r'minSdkVersion\s+flutter\.minSdkVersion', 'minSdkVersion 22', a)
           a = re.sub(r'minSdkVersion\s+\d+', 'minSdkVersion 22', a)
           app_gradle.write_text(a)
-
-          root_gradle = Path("android/build.gradle")
-          r = root_gradle.read_text()
-          r = re.sub(r'kotlin_version\s*=\s*["\'][^"\']+["\']', "kotlin_version = '1.9.0'", r)
-          root_gradle.write_text(r)
 
           props = Path("android/gradle.properties")
           gs = props.read_text() if props.exists() else ""

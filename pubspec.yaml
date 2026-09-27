@@ -2,21 +2,29 @@ name: ma_timer
 description: Ma Timer Android screen-time and focus timer app.
 publish_to: "none"
 version: 1.0.0+1
+
 environment:
   sdk: ">=3.2.0 <4.0.0"
+
 dependencies:
   flutter:
     sdk: flutter
   usage_stats: ^1.2.0
   provider: ^6.1.1
+
+dependency_overrides:
+  usage_stats: 1.2.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_launcher_icons: ^0.14.4
+
 flutter:
   uses-material-design: true
   assets:
     - assets/icon/app_icon.png
+
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
