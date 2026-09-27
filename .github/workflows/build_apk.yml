@@ -35,7 +35,7 @@ jobs:
               if x not in s:s=s.replace('<application',x+'\\n\\n    <application',1)
           s=s.replace('<application ','<application android:directBootAware="true" ',1);p.write_text(s)
           PY
-      - run: echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" > android/gradle.properties
+      - run: printf "%s\n" "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" "android.useAndroidX=true" "android.enableJetifier=true" > android/gradle.properties
       - run: flutter pub get
       - run: dart run flutter_launcher_icons
       - run: flutter analyze --no-fatal-infos
