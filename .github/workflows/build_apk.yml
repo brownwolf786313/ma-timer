@@ -34,6 +34,10 @@ jobs:
           p.write_text(s)
           p=Path("android/build.gradle")
           s=p.read_text().replace("ext.kotlin_version = '1.7.10'","ext.kotlin_version = '1.9.0'")
+          if "force all Kotlin modules to 1.9.0" not in s:
+              s += "
+allprojects { configurations.all { resolutionStrategy.eachDependency { d -> if (d.requested.group == 'org.jetbrains.kotlin') { d.useVersion '1.9.0' } } } }
+"
           p.write_text(s)
           PY
       - name: Configure Android permissions
