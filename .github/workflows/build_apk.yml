@@ -25,6 +25,17 @@ jobs:
           rm -rf android ios
           cp -R /tmp/ma_timer_native/android android
           cp -R /tmp/ma_timer_native/ios ios
+      - name: Configure Android build compatibility
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("android/app/build.gradle")
+          s=p.read_text().replace("minSdkVersion flutter.minSdkVersion","minSdkVersion 22")
+          p.write_text(s)
+          p=Path("android/build.gradle")
+          s=p.read_text().replace("ext.kotlin_version = '1.7.10'","ext.kotlin_version = '1.9.0'")
+          p.write_text(s)
+          PY
       - name: Configure Android permissions
         run: |
           python3 - <<'PY'
