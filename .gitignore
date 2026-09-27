@@ -1,0 +1,8 @@
+.dart_tool/
+build/
+.idea/
+.vscode/
+*.iml
+android/.gradle/
+android/local.properties
+ios/Pods/
