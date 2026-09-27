@@ -44,33 +44,51 @@ jobs:
           cp -R /tmp/ma_timer_native/android ./android
           cp -R /tmp/ma_timer_native/ios ./ios
 
-      - name: Configure Android manifest and Gradle memory
+      - name: Configure Android manifest, SDK and Kotlin
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p = Path("android/app/src/main/AndroidManifest.xml")
-          s = p.read_text()
+          import re
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          s = manifest.read_text()
+
           if 'xmlns:tools=' not in s:
               s = s.replace(
                   'xmlns:android="http://schemas.android.com/apk/res/android"',
                   'xmlns:android="http://schemas.android.com/apk/res/android"\n    xmlns:tools="http://schemas.android.com/tools"'
               )
+
           permissions = '''    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions"/>
               <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
           '''
           marker = '    <application'
           if 'android.permission.PACKAGE_USAGE_STATS' not in s:
               s = s.replace(marker, permissions + marker)
+
           if 'android:directBootAware=' not in s:
               s = s.replace(marker, '    <application android:directBootAware="true"', 1)
+
           s = s.replace('android:label="ma_timer"', 'android:label="Ma Timer"')
-          p.write_text(s)
-          g = Path("android/gradle.properties")
-          gs = g.read_text() if g.exists() else ""
+          manifest.write_text(s)
+
+          app_gradle = Path("android/app/build.gradle")
+          a = app_gradle.read_text()
+          a = re.sub(r'minSdkVersion\s+flutter\.minSdkVersion', 'minSdkVersion 22', a)
+          a = re.sub(r'minSdkVersion\s+\d+', 'minSdkVersion 22', a)
+          app_gradle.write_text(a)
+
+          root_gradle = Path("android/build.gradle")
+          r = root_gradle.read_text()
+          r = re.sub(r'kotlin_version\s*=\s*["\'][^"\']+["\']', "kotlin_version = '1.9.0'", r)
+          root_gradle.write_text(r)
+
+          props = Path("android/gradle.properties")
+          gs = props.read_text() if props.exists() else ""
           lines = [x for x in gs.splitlines() if not x.startswith("org.gradle.jvmargs=")]
           lines.append("org.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m")
-          g.write_text("\n".join(lines) + "\n")
+          props.write_text("\n".join(lines) + "\n")
           PY
 
       - name: Install dependencies
