@@ -1,59 +1,94 @@
 name: Build Ma Timer Release APK
+
 on:
   push:
-    branches: [main, master]
+    branches:
+      - main
+      - master
   workflow_dispatch:
+
 permissions:
   contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v3
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v3
         with:
           distribution: zulu
           java-version: "17"
-      - uses: subosito/flutter-action@v2
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.19.x"
           channel: stable
           cache: true
-      - name: Generate native platforms
+
+      - name: Generate native Flutter platforms
+        shell: bash
         run: |
-          flutter create /tmp/ma_timer_native --platforms=android,ios --org com.matimer --project-name ma_timer
+          rm -rf /tmp/ma_timer_native
+          flutter create \
+            --platforms=android,ios \
+            --org com.matimer \
+            --project-name ma_timer \
+            --no-pub \
+            /tmp/ma_timer_native
           rm -rf android ios
-          cp -R /tmp/ma_timer_native/android android
-          cp -R /tmp/ma_timer_native/ios ios
-      - name: Configure Android build compatibility
+          cp -R /tmp/ma_timer_native/android ./android
+          cp -R /tmp/ma_timer_native/ios ./ios
+
+      - name: Configure Android manifest and Gradle memory
+        shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p=Path("android/app/build.gradle")
-          s=p.read_text().replace("minSdkVersion flutter.minSdkVersion","minSdkVersion 22")
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          if 'xmlns:tools=' not in s:
+              s = s.replace(
+                  'xmlns:android="http://schemas.android.com/apk/res/android"',
+                  'xmlns:android="http://schemas.android.com/apk/res/android"\n    xmlns:tools="http://schemas.android.com/tools"'
+              )
+          permissions = '''    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions"/>
+              <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+          '''
+          marker = '    <application'
+          if 'android.permission.PACKAGE_USAGE_STATS' not in s:
+              s = s.replace(marker, permissions + marker)
+          if 'android:directBootAware=' not in s:
+              s = s.replace(marker, '    <application android:directBootAware="true"', 1)
+          s = s.replace('android:label="ma_timer"', 'android:label="Ma Timer"')
           p.write_text(s)
-          p=Path("android/build.gradle")
-          s=p.read_text().replace("ext.kotlin_version = '1.7.10'","ext.kotlin_version = '1.9.0'")
-          s += "\nallprojects { configurations.all { resolutionStrategy.eachDependency { d -> if (d.requested.group == 'org.jetbrains.kotlin') { d.useVersion '1.9.0' } } } }\n"
-          p.write_text(s)
+          g = Path("android/gradle.properties")
+          gs = g.read_text() if g.exists() else ""
+          lines = [x for x in gs.splitlines() if not x.startswith("org.gradle.jvmargs=")]
+          lines.append("org.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m")
+          g.write_text("\n".join(lines) + "\n")
           PY
-      - name: Configure Android permissions
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path("android/app/src/main/AndroidManifest.xml");s=p.read_text()
-          s=s.replace('<manifest xmlns:android="http://schemas.android.com/apk/res/android">','<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">')
-          for x in ['    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions"/>','    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>']:
-              if x not in s:s=s.replace('<application',x+'\\n\\n    <application',1)
-          s=s.replace('<application ','<application android:directBootAware="true" ',1);p.write_text(s)
-          PY
-      - run: printf "%s\n" "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" "android.useAndroidX=true" "android.enableJetifier=true" > android/gradle.properties
-      - run: flutter pub get
-      - run: dart run flutter_launcher_icons
-      - run: flutter analyze --no-fatal-infos
-      - run: flutter build apk --release --no-tree-shake-icons
-      - uses: actions/upload-artifact@v4
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate launcher icons
+        run: dart run flutter_launcher_icons
+
+      - name: Analyze Dart code
+        run: flutter analyze
+
+      - name: Build release APK
+        run: flutter build apk --release --no-tree-shake-icons
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
           name: MaTimer-Release-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
+          retention-days: 30
