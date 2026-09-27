@@ -1,0 +1,61 @@
+name: Build Ma Timer Release APK
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '17'
+          cache: gradle
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.x'
+          channel: stable
+          cache: true
+      - name: Create clean Android project
+        run: flutter create . --platforms=android --org com.matimer --project-name ma_timer
+      - name: Restore Ma Timer app source
+        run: base64 -d tool/main.dart.gz.b64 | gzip -d > lib/main.dart
+      - name: Configure Android permissions
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('android/app/src/main/AndroidManifest.xml')
+          s=p.read_text()
+          if 'xmlns:tools=' not in s:
+              s=s.replace('xmlns:android="http://schemas.android.com/apk/res/android"','xmlns:android="http://schemas.android.com/apk/res/android"\n    xmlns:tools="http://schemas.android.com/tools"')
+          if 'android.permission.PACKAGE_USAGE_STATS' not in s:
+              s=s.replace('    <application','    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />\n    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />\n\n    <application')
+          s=s.replace('android:label="ma_timer"','android:label="Ma Timer"')
+          if 'android:directBootAware="true"' not in s:
+              s=s.replace('android:label="Ma Timer"','android:label="Ma Timer"\n        android:directBootAware="true"')
+          if 'android:exported="true"' not in s:
+              s=s.replace('<activity','<activity\n            android:exported="true"',1)
+          p.write_text(s)
+          PY
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Generate custom launcher icon
+        run: dart run flutter_launcher_icons
+      - name: Build release APK
+        env:
+          GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+        run: flutter build apk --release --no-tree-shake-icons
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MaTimer-Release-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
